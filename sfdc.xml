@@ -1,0 +1,422 @@
+<project 
+  name="sfdc"
+  basedir="."
+  xmlns:sf="antlib:com.salesforce"
+  xmlns:if="ant:if"
+  xmlns:unless="ant:unless"
+>
+ 	<description>
+		Base template for Salesforce Migration Tool environment-to-environment migrations.
+		
+		Resource Files:
+	    ./sfdc.properties
+	    ${sfdc.basedir}/sfdc.properties
+	    ${user.home}/.ant/sfdc.properties
+		
+		Basic Usage:
+			ant target [-Dproperty=value ...]
+		
+		Targets:
+			fetch		  retrieves all components in ${package}.xml from source.
+			backup		retrieves all components in ${package}.xml from destination.
+			validate	tests all components from source in destination.
+			cancel		cancels a validate or deploy action in destination.
+		
+		Properties:
+			project		directory	path to project. default: ./
+			stage			directory	path to stage within project. default: ./
+			package		filename	name of Package file w/o extension. default: package
+			src				environment	Salesforce environment to retrieve components. default: dv
+			dst				environment	Salesforce environment to deploy components. default: qa
+			task			sfid		Salesforce ID of recent deployment task.
+			test			string		Salesforce test level to run. default: RunLocalTests
+		
+		Usage:
+			ant fetch [-Dproject=dir] [-Dstage=dir] [-Dpackage=name] [-Dsrc=env]
+			ant backup [-Dproject=dir] [-Dstage=dir] [-Dpackage=name] [-Ddst=env]
+			ant validate [-Dproject=dir] [-Dstage=dir] [-Dsrc=env] [-Ddst=env] [-Dtest=testLevel] [-Dtask=id]
+			ant cancel -Dtask=id [-Dproject=dir] [-Dstage=dir] [-Ddst=env]
+		
+		Notes:
+			The typical settings are used to migrate betweeen Salesforce sandboxes. A special exception is made when src or dst is exactly 'prod', which will use production values instead.
+	</description>
+
+	<!-- START properties -->
+
+	<!-- Property Files
+		source properties from files.
+		*$	${project}/${stage}/build.properties,
+			${project}/build.properties, and
+			build.properties - Use for general properties which change
+			  occasionally, e.g. defining src and target environments. Scope
+			  for general purpose, projets, or stages.
+		*$	${user.home}/.ant/properties/salesforce.properties - Path must be
+		      created. Good for common properties across all projects, e.g.
+			  Salesforce usernames, passwords, and URLs.
+	-->
+
+	<!--
+		Project default options. Can be overwritten in files above or via
+		command line using -Dname=value.
+	-->
+  <dirname property="sfdc.basedir" file="${ant.file.sfdc}"/>
+
+  <target name="init">
+    <echo>Looking for properties in ./sfdc.properties</echo>
+	  <property file="./sfdc.properties" prefix="sfdc"/>
+    <echo>Looking for properties in ${sfdc.basedir}/sfdc.properties</echo>
+	  <property file="${sfdc.basedir}/sfdc.properties" prefix="sfdc"/>
+    <echo>Looking for properties in ${user.home}/.ant/sfdc.properties</echo>
+	  <property file="${user.home}/.ant/sfdc.properties" prefix="sfdc"/>
+
+	  <!-- Salesforce environment variables -->
+    <!--
+    <condition property="src.username" value="${sf.username}" else="${sf.username}.${src}">
+      <equals arg1="${src}" arg2="prod" />
+    </condition>
+	  <property name="src.password" value="${sf.password}" />
+	  <condition property="src.serverurl" value="${sf.production.serverurl}" else="${sf.sandbox.serverurl}">
+      <equals arg1="${src}" arg2="prod" />
+    </condition>
+
+    <condition property="dst.username" value="${sf.username}" else="${sf.username}.${dst}">
+      <equals arg1="${dst}" arg2="prod" />
+    </condition>
+	  <property name="dst.password" value="${sf.password}" />
+	  <condition property="dst.serverurl" value="${sf.production.serverurl}" else="${sf.sandbox.serverurl}">
+      <equals arg1="${dst}" arg2="prod" />
+    </condition>
+    -->
+    <antcall target="sfdc.about"/>
+  </target>
+	<!-- END properties -->
+
+
+  <condition property="has-folder">
+    <and>
+      <isset property="sfdc.conf.metadata.folder"/>
+      <not>
+        <equals arg1="${sfdc.conf.metadata.folder}" arg2=""/>
+      </not>
+    </and>
+  </condition>
+
+	<!-- START targets -->
+
+	<!-- about -->
+	<target name="about" if="${sfdc.conf.verbose}">
+		<echoproperties regex="^sfdc\.conf\.((?!password).)*$"/>
+	</target>
+
+  <target name="set-asyncRequestId" depends="sfdc.init">
+		<condition property="sf.asyncRequestId" value="${sfdc.conf.request.id}">
+      <and>
+			  <isset property="sfdc.conf.request.id" />
+        <not>
+          <equals arg1="${sfdc.conf.request.id}" arg2=""/>
+        </not>
+      </and>
+		</condition>
+  </target>
+
+  <target name="init-retrieve" depends="sfdc.init">
+    <property name="sfdc.task.retrieve.username" value="${sfdc.conf.auth.username}"/>
+    <property name="sfdc.task.retrieve.password" value="${sfdc.conf.auth.password}"/>
+    <property name="sfdc.task.retrieve.sessionId" value="${sfdc.conf.auth.sessionId}"/>
+    <property name="sfdc.task.retrieve.serverurl" value="${sfdc.conf.auth.serverurl}"/>
+    <property name="sfdc.task.retrieve.retrieveTarget" value="${sfdc.conf.source.path}"/>
+    <property name="sfdc.task.retrieve.packageNames" value=""/>
+    <property name="sfdc.task.retrieve.apiVersion" value="${sfdc.conf.api.version}"/>
+    <property name="sfdc.task.retrieve.pollWaitMillis" value="${sfdc.conf.network.pollWaitMillis}"/>
+    <property name="sfdc.task.retrieve.maxPoll" value="${sfdc.conf.network.maxPoll}"/>
+    <property name="sfdc.task.retrieve.singlePackage" value="true"/>
+    <property name="sfdc.task.retrieve.trace" value="${sfdc.conf.logging.trace}"/>
+    <property name="sfdc.task.retrieve.unpackaged" value=""/>
+    <property name="sfdc.task.retrieve.unzip" value="true"/>
+  </target>
+
+  <target name="init-bulkRetrieve" depends="sfdc.init">
+    <property name="sfdc.task.bulkRetrieve.username" value="${sfdc.conf.auth.username}"/>
+    <property name="sfdc.task.bulkRetrieve.password" value="${sfdc.conf.auth.password}"/>
+    <property name="sfdc.task.bulkRetrieve.sessionId" value="${sfdc.conf.auth.sessionId}"/>
+    <property name="sfdc.task.bulkRetrieve.serverurl" value="${sfdc.conf.auth.serverurl}"/>
+    <property name="sfdc.task.bulkRetrieve.retrieveTarget" value="${sfdc.conf.source.path}"/>
+    <property name="sfdc.task.bulkRetrieve.metadataType" value="${sfdc.conf.metadata.type}"/>
+    <property name="sfdc.task.bulkRetrieve.containingFolder" value="${sfdc.conf.metadata.folder}"/>
+    <property name="sfdc.task.bulkRetrieve.batchSize" value="10"/>
+    <property name="sfdc.task.bulkRetrieve.apiVersion" value="${sfdc.conf.api.version}"/>
+    <property name="sfdc.task.bulkRetrieve.maxPoll" value="${sfdc.conf.network.maxPoll}"/>
+    <property name="sfdc.task.bulkRetrieve.unzip" value="true"/>
+  </target>
+
+  <target name="init-deploy" depends="sfdc.init">
+    <property name="sfdc.task.deploy.username" value="${sfdc.conf.auth.username}"/>
+    <property name="sfdc.task.deploy.password" value="${sfdc.conf.auth.password}"/>
+    <property name="sfdc.task.deploy.sessionId" value="${sfdc.conf.auth.sessionId}"/>
+    <property name="sfdc.task.deploy.serverurl" value="${sfdc.conf.auth.serverurl}"/>
+    <property name="sfdc.task.deploy.pollWaitMillis" value="${sfdc.conf.network.pollWaitMillis}"/>
+    <property name="sfdc.task.deploy.checkOnly" value="false"/>
+    <property name="sfdc.task.deploy.maxPoll" value="${sfdc.conf.network.maxPoll}"/>
+    <property name="sfdc.task.deploy.deployRoot" value="${sfdc.conf.source.path}"/>
+    <property name="sfdc.task.deploy.zipFile" value=""/>
+    <property name="sfdc.task.deploy.singlePackage" value="false"/>
+    <property name="sfdc.task.deploy.allowMissingFiles" value="false"/>
+    <property name="sfdc.task.deploy.autoUpdatePackage" value="false"/>
+    <property name="sfdc.task.deploy.ignoreWarnings" value="false"/>
+    <property name="sfdc.task.deploy.logType" value="None"/>
+    <property name="sfdc.task.deploy.purgeOnDelete" value=""/>
+    <property name="sfdc.task.deploy.rollbackOnError" value="true"/>
+    <!-- deprecated after 33.0
+    <property name="task.deploy.runAllTests" value="false"/>
+    -->
+    <property name="sfdc.task.deploy.runTest" value=""/>
+    <property name="sfdc.task.deploy.testLevel" value="${sfdc.conf.deploy.testLevel}"/>
+    <property name="sfdc.task.deploy.trace" value="${sfdc.conf.logging.trace}"/>
+  </target>
+
+  <target name="init-deployRecentValidation" depends="sfdc.init">
+    <property name="sfdc.task.deployRecentValidation.username" value="${sfdc.conf.auth.username}"/>
+    <property name="sfdc.task.deployRecentValidation.password" value="${sfdc.conf.auth.password}"/>
+    <property name="sfdc.task.deployRecentValidation.recentValidationId" value="${sfdc.conf.request.id}"/>
+    <property name="sfdc.task.deployRecentValidation.sessionId" value="${sfdc.conf.auth.sessionId}"/>
+    <property name="sfdc.task.deployRecentValidation.serverurl" value="${sfdc.conf.auth.serverurl}"/>
+    <property name="sfdc.task.deployRecentValidation.rollbackOnError" value="true"/>
+    <property name="sfdc.task.deployRecentValidation.maxPoll" value="${sfdc.conf.network.maxPoll}"/>
+    <property name="sfdc.task.deployRecentValidation.pollWaitMillis" value="${sfdc.conf.network.pollWaitMillis}"/>
+    <property name="sfdc.task.deployRecentValidation.trace" value="${sfdc.conf.logging.trace}"/>
+  </target>
+
+  <target name="init-cancelDeploy" depends="sfdc.init">
+    <property name="sfdc.task.cancelDeploy.username" value="${sfdc.conf.auth.username}"/>
+    <property name="sfdc.task.cancelDeploy.password" value="${sfdc.conf.auth.password}"/>
+    <property name="sfdc.task.cancelDeploy.sessionId" value="${sfdc.conf.auth.sessionId}"/>
+    <property name="sfdc.task.cancelDeploy.requestId" value="${sfdc.conf.request.id}"/>
+    <property name="sfdc.task.cancelDeploy.serverurl" value="${sfdc.conf.auth.serverurl}"/>
+    <property name="sfdc.task.cancelDeploy.maxPoll" value="${sfdc.conf.network.maxPoll}"/>
+    <property name="sfdc.task.cancelDeploy.pollWaitMillis" value="${sfdc.conf.network.pollWaitMillis}"/>
+    <property name="sfdc.task.cancelDeploy.trace" value="${sfdc.conf.logging.trace}"/>
+  </target>
+
+  <target name="init-describeMetadata" depends="sfdc.init">
+    <property name="sfdc.task.describeMetadata.username" value="${sfdc.conf.auth.username}"/>
+    <property name="sfdc.task.describeMetadata.password" value="${sfdc.conf.auth.password}"/>
+    <property name="sfdc.task.describeMetadata.sessionId" value="${sfdc.conf.auth.sessionId}"/>
+    <property name="sfdc.task.describeMetadata.serverurl" value="${sfdc.conf.auth.serverurl}"/>
+    <property name="sfdc.task.describeMetadata.apiVersion" value="${sfdc.conf.api.version}"/>
+    <property name="sfdc.task.describeMetadata.resultFilePath" value="${sfdc.conf.info.path}"/>
+    <property name="sfdc.task.describeMetadata.trace" value="${sfdc.conf.logging.trace}"/>
+  </target>
+
+  <target name="init-listMetadata" depends="sfdc.init">
+    <property name="sfdc.task.listMetadata.username" value="${sfdc.conf.auth.username}"/>
+    <property name="sfdc.task.listMetadata.password" value="${sfdc.conf.auth.password}"/>
+    <property name="sfdc.task.listMetadata.sessionId" value="${sfdc.conf.auth.sessionId}"/>
+    <property name="sfdc.task.listMetadata.serverurl" value="${sfdc.conf.auth.serverurl}"/>
+    <property name="sfdc.task.listMetadata.metadataType" value="${sfdc.conf.metadata.type}"/>
+    <property name="sfdc.task.listMetadata.folder" value="${sfdc.conf.metadata.folder}"/>
+    <property name="sfdc.task.listMetadata.apiVersion" value="${sfdc.conf.api.version}"/>
+    <property name="sfdc.task.listMetadata.resultFilePath" value="${sfdc.conf.info.path}"/>
+    <property name="sfdc.task.listMetadata.trace" value="${sfdc.conf.logging.trace}"/>
+  </target>
+
+
+	<target name="retrieve" depends="sfdc.init-retrieve,sfdc.set-asyncRequestId,sfdc.pre-retrieve">
+		<echo>Retrieving ${sfdc.task.retrieve.unpackaged} from ${sfdc.conf.env.name}.</echo>
+		<mkdir dir="${sfdc.task.retrieve.retrieveTarget}"/>
+		<echo if:set="sf.asyncRequestId"> ... from previous request ${sf.asyncRequestId}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.retrieve\.((?!password).)*$"/>
+		<sf:retrieve
+		  username="${sfdc.task.retrieve.username}"
+		  password="${sfdc.task.retrieve.password}"
+		  serverurl="${sfdc.task.retrieve.serverurl}"
+		  apiVersion="${sfdc.task.retrieve.apiVersion}"
+		  maxPoll="${sfdc.task.retrieve.maxPoll}"
+		  pollWaitMillis="${sfdc.task.retrieve.pollWaitMillis}"
+		  unpackaged="${sfdc.task.retrieve.unpackaged}"
+		  retrieveTarget="${sfdc.task.retrieve.retrieveTarget}"
+		  trace="${sfdc.task.retrieve.trace}"
+		/>
+    <!-- unused properties
+		  sessionId="${sfdc.task.retrieve.sessionId}"
+		  packageNames="${sfdc.task.retrieve.packageNames}"
+		  singlePackage="${sfdc.task.retrieve.singlePackage}"
+		  unzip="${sfdc.task.retrieve.unzip}"
+    -->
+	</target>
+
+	<target name="deploy" depends="sfdc.init-deploy,sfdc.set-asyncRequestId,sfdc.pre-deploy">
+		<echo unless:true="${sfdc.task.deploy.checkOnly}">Deploying ${sfdc.task.deploy.deployRoot} to ${sfdc.conf.env.name} with testLevel ${sfdc.task.deploy.testLevel}.</echo>
+		<echo if:true="${sfdc.task.deploy.checkOnly}">Validating ${sfdc.task.deploy.deployRoot} to ${sfdc.conf.env.name} with testLevel ${sfdc.task.deploy.testLevel}.</echo>
+		<echo if:set="sf.asyncRequestId"> ... from previous request ${sf.asyncRequestId}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.deploy\.((?!password).)*$"/>
+		<sf:deploy
+      username="${sfdc.task.deploy.username}"
+      password="${sfdc.task.deploy.password}"
+      serverurl="${sfdc.task.deploy.serverurl}"
+      pollWaitMillis="${sfdc.task.deploy.pollWaitMillis}"
+      checkOnly="${sfdc.task.deploy.checkOnly}"
+      maxPoll="${sfdc.task.deploy.maxPoll}"
+      deployRoot="${sfdc.task.deploy.deployRoot}"
+      rollbackOnError="${sfdc.task.deploy.rollbackOnError}"
+      testLevel="${sfdc.task.deploy.testLevel}"
+      trace="${sfdc.task.deploy.trace}"
+		/>
+    <!-- unused properties
+      sessionId="${sfdc.task.deploy.sessionId}"
+      zipFile="${sfdc.task.deploy.zipFile}"
+      singlePackage="${sfdc.task.deploy.singlePackage}"
+      allowMissingFiles="${sfdc.task.deploy.allowMissingFiles}"
+      autoUpdatePackage="${sfdc.task.deploy.autoUpdatePackage}"
+      ignoreWarnings="${sfdc.task.deploy.ignoreWarnings}"
+      logType="${sfdc.task.deploy.logType}"
+      purgeOnDelete="${sfdc.task.deploy.purgeOnDelete}"
+      runAllTests="${sfdc.task.deploy.runAllTests}"
+      runTest="${sfdc.task.deploy.runTest}"
+    -->
+	</target>
+
+  <target name="deployRequest" depends="sfdc.init-deployRecentValidation,sfdc.pre-deployRequest">
+		<echo>Deploying ${sfdc.task.deployRecentValidation.recentValidationId} from ${sfdc.conf.env.name}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.deployRecentValidation\.((?!password).)*$"/>
+    <sf:deployRecentValidation
+      username="${sfdc.task.deployRecentValidation.username}"
+      password="${sfdc.task.deployRecentValidation.password}"
+      recentValidationId="${sfdc.task.deployRecentValidation.recentValidationId}"
+      serverurl="${sfdc.task.deployRecentValidation.serverurl}"
+      rollbackOnError="${sfdc.task.deployRecentValidation.rollbackOnError}"
+      maxPoll="${sfdc.task.deployRecentValidation.maxPoll}"
+      pollWaitMillis="${sfdc.task.deployRecentValidation.pollWaitMillis}"
+      trace="${sfdc.task.deployRecentValidation.trace}"
+    />
+    <!-- unused properties
+      sessionId="${task.deployRecentValidation.sessionId}"
+    -->
+  </target>
+
+	<target name="cancel" depends="sfdc.init-cancelDeploy,sfdc.pre-cancel">
+		<echo>Cancelling task ${task.cancelDeploy.requestId} in ${sfdc.conf.env.name}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.cancelDeploy\.((?!password).)*$"/>
+		<sf:cancelDeploy
+      username="${sfdc.task.cancelDeploy.username}"
+      password="${sfdc.task.cancelDeploy.password}"
+      requestId="${sfdc.task.cancelDeploy.requestId}"
+      serverurl="${sfdc.task.cancelDeploy.serverurl}"
+      maxPoll="${sfdc.task.cancelDeploy.maxPoll}"
+      pollWaitMillis="${sfdc.task.cancelDeploy.pollWaitMillis}"
+      trace="${sfdc.task.cancelDeploy.trace}"
+		/>
+    <!-- unused properties
+      sessionId="${task.cancelDeploy.sessionId}"
+    -->
+	</target>
+
+	<target name="bulkRetrieve-folder" depends="sfdc.init-bulkRetrieve,sfdc.pre-bulkRetrieve" if="has-folder">
+		<echo>Retrieving all ${sfdc.task.buldRetrieve.containingFolder}/${sfdc.task.bulkRetrieve.metadataType} in ${sfdc.conf.env.name}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.bulkRetrieve\.((?!password).)*$"/>
+		<sf:bulkRetrieve
+      username="${sfdc.task.bulkRetrieve.username}"
+      password="${sfdc.task.bulkRetrieve.password}"
+      serverurl="${sfdc.task.bulkRetrieve.serverurl}"
+      retrieveTarget="${sfdc.task.bulkRetrieve.retrieveTarget}"
+      metadataType="${sfdc.task.bulkRetrieve.metadataType}"
+      containingFolder="${sfdc.task.bulkRetrieve.containingFolder}"
+      batchSize="${sfdc.task.bulkRetrieve.batchSize}"
+      apiVersion="${sfdc.task.bulkRetrieve.apiVersion}"
+      maxPoll="${sfdc.task.bulkRetrieve.maxPoll}"
+    />
+    <!-- unused properties
+      sessionId="${sfdc.task.bulkRetrieve.sessionId}"
+      unzip="${sfdc.task.bulkRetrieve.unzip}"
+    -->
+	</target>
+	<target name="bulkRetrieve" depends="sfdc.init-bulkRetrieve,sfdc.pre-bulkRetrieve,sfdc.bulkRetrieve-folder" unless="has-folder">
+		<echo>Retrieving all ${sfdc.task.bulkRetrieve.metadataType} in ${sfdc.conf.conf.env.name}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.bulkRetrieve\.((?!password).)*$"/>
+		<sf:bulkRetrieve
+      username="${sfdc.task.bulkRetrieve.username}"
+      password="${sfdc.task.bulkRetrieve.password}"
+      serverurl="${sfdc.task.bulkRetrieve.serverurl}"
+      retrieveTarget="${sfdc.task.bulkRetrieve.retrieveTarget}"
+      metadataType="${sfdc.task.bulkRetrieve.metadataType}"
+      batchSize="${sfdc.task.bulkRetrieve.batchSize}"
+      apiVersion="${sfdc.task.bulkRetrieve.apiVersion}"
+      maxPoll="${sfdc.task.bulkRetrieve.maxPoll}"
+    />
+    <!-- unused properties
+      containingFolder="${sfdc.task.bulkRetrieve.containingFolder}"
+      sessionId="${sfdc.task.bulkRetrieve.sessionId}"
+      unzip="${sfdc.task.bulkRetrieve.unzip}"
+    -->
+	</target>
+
+	<target name="describe" depends="sfdc.init-describeMetadata,sfdc.pre-describe">
+		<echo>Describing metadata in ${sfdc.conf.env.name}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.describeMetadata\.((?!password).)*$"/>
+		<sf:describeMetadata
+      username="${sfdc.task.describeMetadata.username}"
+      password="${sfdc.task.describeMetadata.password}"
+      serverurl="${sfdc.task.describeMetadata.serverurl}"
+      apiVersion="${sfdc.task.describeMetadata.apiVersion}"
+      resultFilePath="${sfdc.task.describeMetadata.resultFilePath}"
+      trace="${sfdc.task.describeMetadata.trace}"
+    />
+    <!-- unused properties
+      sessionId="${sfdc.task.describeMetadata.sessionId}"
+    -->
+	</target>
+
+	<target name="list-folder" depends="sfdc.init-listMetadata,sfdc.pre-list" if="has-folder">
+		<echo>Listing ${sfdc.task.listMetadata.folder}/${sfdc.task.listMetadata.metadataType} metadata in ${sfdc.conf.env.name}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.listMetadata\.((?!password).)*$"/>
+		<sf:listMetadata
+      username="${sfdc.task.listMetadata.username}"
+      password="${sfdc.task.listMetadata.password}"
+      serverurl="${sfdc.task.listMetadata.serverurl}"
+      metadataType="${sfdc.task.listMetadata.metadataType}"
+      folder="${sfdc.task.listMetadata.folder}"
+      apiVersion="${sfdc.task.listMetadata.apiVersion}"
+      resultFilePath="${sfdc.task.listMetadata.resultFilePath}"
+      trace="${sfdc.task.listMetadata.trace}"
+    />
+    <!-- unused properties
+      sessionId="${sfdc.task.listMetadata.sessionId}"
+    -->
+  </target>
+	<target name="list" depends="sfdc.init-listMetadata,sfdc.pre-list,sfdc.list-folder" unless="has-folder">
+		<echo>Listing ${sfdc.task.listMetadata.metadataType} metadata in ${sfdc.conf.env.name}.</echo>
+		<echoproperties if:true="${sfdc.conf.verbose}" regex="^sfdc\.task\.listMetadata\.((?!password).)*$"/>
+		<sf:listMetadata
+      username="${sfdc.task.listMetadata.username}"
+      password="${sfdc.task.listMetadata.password}"
+      serverurl="${sfdc.task.listMetadata.serverurl}"
+      metadataType="${sfdc.task.listMetadata.metadataType}"
+      apiVersion="${sfdc.task.listMetadata.apiVersion}"
+      resultFilePath="${sfdc.task.listMetadata.resultFilePath}"
+      trace="${sfdc.task.listMetadata.trace}"
+    />
+    <!-- unused properties
+      folder="${sfdc.task.listMetadata.folder}"
+      sessionId="${sfdc.task.listMetadata.sessionId}"
+    -->
+	</target>
+	<!-- END targets -->
+
+  <!-- START extension points -->
+  <extension-point name="pre-retrieve" depends="sfdc.init-retrieve"/>
+  <extension-point name="pre-deploy" depends="sfdc.init-deploy"/>
+  <extension-point name="pre-deployRequest" depends="sfdc.init-deployRecentValidation"/>
+  <extension-point name="pre-cancel" depends="sfdc.init-cancelDeploy"/>
+  <extension-point name="pre-bulkRetrieve" depends="sfdc.init-bulkRetrieve"/>
+  <extension-point name="pre-describe" depends="sfdc.init-describeMetadata"/>
+  <extension-point name="pre-list" depends="sfdc.init-listMetadata"/>
+
+  <extension-point name="post-retrieve" depends="sfdc.retrieve"/>
+  <extension-point name="post-deploy" depends="sfdc.deploy"/>
+  <extension-point name="post-deployRequest" depends="sfdc.deployRequest"/>
+  <extension-point name="post-cancel" depends="sfdc.cancel"/>
+  <extension-point name="post-bulkRetrieve" depends="sfdc.bulkRetrieve"/>
+  <extension-point name="post-describe" depends="sfdc.describe"/>
+  <extension-point name="post-list" depends="sfdc.list"/>
+  <!-- END extension points -->
+
+</project>

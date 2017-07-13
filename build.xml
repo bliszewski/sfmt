@@ -1,0 +1,351 @@
+<project 
+  name="sfmt"
+  default="about"
+  basedir="."
+  xmlns:if="ant:if"
+>
+  <description>
+    Standard build template for Salesforce Migration Tool environment-to-environment migrations.
+
+    Resource Files:
+      ./build.properties
+
+    Basic Usage:
+      ant target [-Dproperty=value ...]
+
+    Targets:
+      about     list all properties.
+
+    Properties:
+
+    Usage:
+      ant [about] [-Dproperty=value ...]
+  </description>
+
+  <!-- START 'sfmt' properties -->
+  <!--<property name="sfmt.basedir" location="."/>-->
+  <dirname property="sfmt.basedir" file="${ant.file.sfmt}"/>
+  <echo>Looking for properties in ${sfmt.basedir}/build.properties</echo>
+  <property file="${sfmt.basedir}/build.properties"/>
+  <property name="sfmt.execpath" location="."/>
+
+  <property name="sfmt.default.package" value="package.xml"/>
+  <property name="sfmt.default.readme" value="README.txt"/>
+
+  <!-- workitem definitions -->
+  <condition property="workitem" value="${work}" else="">
+    <isset property="work"/>
+  </condition>
+  <condition property="workitem.label" value="" else="${workitem}">
+    <equals arg1="${workitem}" arg2=""/>
+  </condition>
+  <condition property="workitem.path" value="." else="${dirs.workitems}/${workitem.label}">
+    <equals arg1="${workitem}" arg2=""/>
+  </condition>
+  <property name="workitem.properties" value="build.properties"/>
+  <condition property="workitem.package" value="${sfmt.default.package}" else="${workitem.label}-${sfmt.default.package}">
+    <equals arg1="${workitem}" arg2=""/>
+  </condition>
+  <condition property="workitem.readme" value="${sfmt.default.readme}" else="${workitem.label}-${sfmt.default.readme}">
+    <equals arg1="${workitem}" arg2=""/>
+  </condition>
+
+  <!-- patch definitions -->
+  <condition property="patchitem" value="${patch}" else="">
+    <isset property="patch"/>
+  </condition>
+  <condition property="patchitem.label" value="root" else="${patchitem}">
+    <equals arg1="${patchitem}" arg2=""/>
+  </condition>
+  <property name="patchitem.path" value="${workitem.path}/${patchitem.label}"/>
+  <condition property="patchitem.properties" value="${workitem.properties}" else="build-${patchitem.label}.properties">
+    <equals arg1="${patchitem}" arg2=""/>
+  </condition>
+  <condition property="patchitem.package" value="${workitem.package}" else="${workitem.label}-${patchitem.label}-${sfmt.default.package}">
+    <equals arg1="${patchitem}" arg2=""/>
+  </condition>
+  <condition property="patchitem.readme" value="${workitem.readme}" else="${workitem.label}-${patchitem.label}-${sfmt.default.readme}">
+    <equals arg1="${patchitem}" arg2=""/>
+  </condition>
+
+  <!-- package manifest -->
+  <property name="sfmt.build.patch" value="${patchitem.label}"/>
+  <property name="sfmt.build.path" location="${sfmt.basedir}/${workitem.path}"/>
+  <property name="sfmt.build.xml" location="${sfmt.build.path}/build.xml"/>
+  <property name="sfmt.build.properties" location="${sfmt.build.path}/${patchitem.properties}"/>
+  <property name="sfmt.build.src" location="${sfmt.build.path}/${sfmt.build.patch}"/>
+  <property name="sfmt.build.backup" location="${sfmt.build.path}/backup/${sfmt.build.patch}"/>
+  <property name="sfmt.build.package" location="${sfmt.build.path}/${patchitem.package}"/>
+  <property name="sfmt.build.readme" location="${sfmt.build.path}/${patchitem.readme}"/>
+
+  <property file="${sfmt.build.properties}"/>
+  <property name="sfmt.api.version" value="${api}"/>
+
+  <!-- migration source -->
+  <condition property="source" value="${env}">
+    <and>
+      <not>
+        <isset property="source"/>
+      </not>
+      <isset property="env"/>
+    </and>
+  </condition>
+  <condition property="sfmt.source.environment" value="${source}" else="">
+    <isset property="source"/>
+  </condition>
+  <property name="sfmt.source.path" location="${sfmt.basedir}/${patchitem.path}"/>
+
+  <!-- -->
+  <condition property="has-workitem">
+    <not>
+      <equals arg1="${workitem}" arg2=""/>
+    </not>
+  </condition>
+  <condition property="has-patchitem">
+    <not>
+      <equals arg1="${patchitem}" arg2=""/>
+    </not>
+  </condition>
+  <!-- END 'sfmt' properties -->
+
+  <tstamp>
+    <format property="time.stamp" pattern="yyyy-MM-dd HH.mm.ss"/>
+  </tstamp>
+
+  <!-- START targets -->
+  <target name="about">
+    <echo>Salesforce Migration Tool Properties</echo>
+    <echoproperties prefix="sfmt"/>
+    <echo>Salesforce Migration Tool Environments</echo>
+    <echoproperties prefix="envs"/>
+    <echo>Workitem Properties</echo>
+    <echoproperties prefix="workitem"/>
+    <echo>Patch Properties</echo>
+    <echoproperties prefix="patchitem"/>
+    <echo>Build Properties</echo>
+    <echoproperties prefix="sfmt.build"/>
+  </target>
+
+  <target name="new" depends="create-workitem,create-package,create-readme,create-properties,create-build">
+    <!-- TODO: create and open git feature branch as first depends? -->
+    <echo>Initialized new migration at [${sfmt.build.path}]</echo>
+    <!-- TODO: initial commit to git feature branch? -->
+  </target>
+
+  <target name="create-workitem" if="has-workitem">
+    <echo>Creating Directory [${sfmt.build.path}]</echo>
+    <mkdir dir="${sfmt.build.path}"/>
+  </target>
+
+  <target name="create-package" depends="create-workitem">
+    <echo>Creating file [${sfmt.build.package}]</echo>
+    <echoxml file="${sfmt.build.package}" namespacePolicy="all">
+      <Package xmlns="http://soap.sforce.com/2006/04/metadata">
+          <types>
+              <members>Admin</members>
+              <name>Profile</name>
+          </types>
+          <version>${sfmt.api.version}</version>
+      </Package>
+    </echoxml>
+  </target>
+
+  <target name="create-readme" depends="create-workitem">
+    <echo>Creating file [${sfmt.build.readme}]</echo>
+    <echo file="${sfmt.build.readme}">Work:   ${workitem.label}
+Patch:  ${patchitem.label}
+
+List deployment instructions in order below.
+
+1. Validate and Deploy ${patchitem.package}
+    </echo>
+  </target>
+
+  <target name="create-patch-properties" depends="create-workitem" if="has-patchitem">
+    <echo>Creating file [${sfmt.build.path}/${patchitem.properties}]</echo>
+    <propertyfile file="${sfmt.build.path}/${patchitem.properties}">
+      <entry key="patch" value="${patchitem}"/>
+    </propertyfile>
+  </target>
+
+  <target name="create-work-properties" depends="create-workitem" if="has-workitem">
+    <echo>Creating file [${sfmt.build.path}/${workitem.properties}]</echo>
+    <propertyfile file="${sfmt.build.path}/${workitem.properties}">
+      <entry key="work" value="${workitem}"/>
+      <entry key="source" value="${sfmt.source.environment}"/>
+    </propertyfile>
+  </target>
+
+  <target name="create-properties" depends="create-work-properties,create-patch-properties">
+    <echo if:set="has-workitem">Created [${sfmt.build.path}/${workitem.properties}]</echo>
+    <echo if:set="has-patchitem">Created [${sfmt.build.path}/${patchitem.properties}]</echo>
+  </target>
+
+  <target name="create-build" depends="create-workitem" if="has-workitem">
+    <echo>Creating file [${sfmt.build.xml}]</echo>
+    <echoxml file="${sfmt.build.xml}">
+      <project name="${workitem}" default="about" basedir=".">
+        <property name="sfmt.basedir" location="${sfmt.basedir}"/>
+        <dirname property="sfmt.basedir.workitem" file="${ant.file.${workitem}}"/>
+        <echo>Looking for properties in ${sfmt.basedir.workitem}/build-$${patch}.properties"</echo>
+        <property file="${sfmt.basedir.workitem}/build-$${patch}.properties"/>
+        <echo>Looking for properties in ${sfmt.basedir.workitem}/build.properties"</echo>
+        <property file="${sfmt.basedir.workitem}/build.properties"/>
+        <import file="${sfmt.basedir}/build.xml" as="sfmt"/>
+      </project>
+    </echoxml>
+  </target>
+  <!-- END targets -->
+
+  <!-- START extension points -->
+  <!-- END extension points -->
+
+  <!-- START sfdc properties -->
+  <property name="sfdc.conf.api.version" value="${sfmt.api.version}"/>
+  <property name="sfdc.conf.source.path" value="${sfmt.source.path}"/>
+  <condition property="sfdc.conf.verbose" value="${verbose}">
+    <isset property="verbose"/>
+  </condition>
+  <condition property="sfdc.conf.deploy.testLevel" value="${testLevel}" else="RunLocalTests">
+    <isset property="testLevel"/>
+  </condition>
+  <condition property="sfdc.conf.network.trace" value="${trace}">
+    <isset property="trace"/>
+  </condition>
+  <condition property="sfdc.conf.request.id" value="${request}">
+    <isset property="request"/>
+  </condition>
+  <condition property="sfdc.conf.metadata.type" value="${metadata}">
+    <isset property="metadata"/>
+  </condition>
+  <condition property="sfdc.conf.metadata.folder" value="${folder}">
+    <isset property="folder"/>
+  </condition>
+
+  <target name="-bind-auth">
+    <condition property="sfdc.conf.auth.username" value="${auth.username}" else="${auth.username}.${sfdc.conf.env.name}">
+      <equals arg1="${sfdc.conf.env.name}" arg2="${envs.production}"/>
+    </condition>
+    <condition property="sfdc.conf.auth.password" value="${auth.password}">
+      <isset property="auth.password"/>
+    </condition>
+    <condition property="sfdc.conf.auth.serverurl" value="${sfdc.serverurl.production}" else="${sfdc.serverurl.sandbox}">
+      <equals arg1="${sfdc.conf.env.name}" arg2="${envs.production}"/>
+    </condition>
+  </target>
+
+  <target name="-work-in-source">
+    <property name="sfdc.conf.env.name" value="${sfmt.source.environment}"/>
+  </target>
+  <target name="-work-in-env">
+    <property name="sfdc.conf.env.name" value="${env}"/>
+  </target>
+  <target name="-work-in-dev">
+    <property name="sfdc.conf.env.name" value="${envs.dev}"/>
+  </target>
+  <target name="-work-in-test">
+    <property name="sfdc.conf.env.name" value="${envs.test}"/>
+  </target>
+  <target name="-work-in-stage">
+    <property name="sfdc.conf.env.name" value="${envs.stage}"/>
+  </target>
+  <target name="-work-in-production">
+    <property name="sfdc.conf.env.name" value="${envs.production}"/>
+  </target>
+  <!-- END sfdc properties -->
+
+  <!--<echoproperties prefix="sfdc"/>-->
+  <import file="${sfmt.basedir}/sfdc.xml" as="sfdc"/>
+
+  <!-- fetch retrieves package from source sandbox -->
+  <target name="fetch" depends="-bind-auth">
+    <property name="sfdc.task.retrieve.retrieveTarget" value="${sfmt.build.src}"/>
+    <property name="sfdc.task.retrieve.unpackaged" value="${sfmt.build.package}"/>
+    <antcall target="sfdc.post-retrieve"/>
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.${sfdc.conf.env.name}.${sfmt.build.patch}.fetch.last" value="${time.stamp}"/>
+    </propertyfile>
+  </target>
+  <target name="backup" depends="-bind-auth">
+    <!-- set directory to ${environments}/${sfdc.conf.env.name}/dir -->
+    <property name="sfdc.task.retrieve.retrieveTarget" value="${sfmt.build.backup}"/>
+    <property name="sfdc.task.retrieve.unpackaged" value="${sfmt.build.package}"/>
+    <antcall target="sfdc.post-retrieve"/>
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.${sfdc.conf.env.name}.${sfmt.build.patch}.backup.last" value="${time.stamp}"/>
+    </propertyfile>
+  </target>
+  <target name="validate" depends="-bind-auth">
+    <!-- todo: depends backup? -->
+    <property name="sfdc.task.deploy.checkOnly" value="true"/>
+    <property name="sfdc.task.deploy.deployRoot" value="${sfmt.build.src}"/>
+    <antcall target="sfdc.post-deploy"/>
+    <!-- TODO: capture requestId and save to workitem properties? -->
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.${sfdc.conf.env.name}.${sfmt.build.patch}.validate.last" value="${time.stamp}"/>
+      <!-- add request id?
+      <entry key="run.${sfdc.conf.env.name}.validate.request" value="${}"/>
+      -->
+    </propertyfile>
+  </target>
+  <target name="deploy" depends="-bind-auth">
+    <!-- todo: depends backup? -->
+    <property name="sfdc.task.deployRecentValidation.recentValidationId" value="${request}"/>
+    <antcall target="sfdc.post-deployRequest"/>
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.${sfdc.conf.env.name}.${sfmt.build.patch}.deploy.last" value="${time.stamp}"/>
+      <entry key="run.${sfdc.conf.env.name}.${sfmt.build.patch}.deploy.request" value="${sfdc.task.deployRecentValidation.recentValidationId}"/>
+    </propertyfile>
+  </target>
+  <target name="describe" depends="-bind-auth">
+    <antcall target="sfdc.post-describe"/>
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.${sfdc.conf.env.name}.describe.last" value="${time.stamp}"/>
+    </propertyfile>
+  </target>
+  <target name="list" depends="-bind-auth">
+    <antcall target="sfdc.post-list"/>
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.${sfdc.conf.env.name}.list.last" value="${time.stamp}"/>
+    </propertyfile>
+  </target>
+  <target name="fetchAll" depends="-bind-auth">
+    <antcall target="sfdc.post-bulkRetrieve"/>
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.${sfdc.conf.env.name}.fetchAll.last" value="${time.stamp}"/>
+    </propertyfile>
+  </target>
+
+
+  <extension-point name="fetch-from-source" depends="-work-in-source,fetch"/>
+
+  <extension-point name="backup-from-dev" depends="-work-in-dev,backup"/>
+  <extension-point name="validate-in-dev" depends="-work-in-dev,validate"/>
+  <extension-point name="deploy-in-dev" depends="-work-in-dev,deploy"/>
+
+  <extension-point name="backup-from-test" depends="-work-in-test,backup"/>
+  <extension-point name="validate-in-test" depends="-work-in-test,validate"/>
+  <extension-point name="deploy-in-test" depends="-work-in-test,deploy"/>
+
+  <extension-point name="backup-from-stage" depends="-work-in-stage,backup"/>
+  <extension-point name="validate-in-stage" depends="-work-in-stage,validate"/>
+  <extension-point name="deploy-in-stage" depends="-work-in-stage,deploy"/>
+
+  <extension-point name="backup-from-production" depends="-work-in-production,backup"/>
+  <extension-point name="validate-in-production" depends="-work-in-production,validate"/>
+  <extension-point name="deploy-in-production" depends="-work-in-production,deploy"/>
+
+  <extension-point name="backup-from-env" depends="-work-in-env,backup"/>
+  <extension-point name="validate-in-env" depends="-work-in-env,validate"/>
+  <extension-point name="deploy-in-env" depends="-work-in-env,deploy"/>
+
+  <!-- set next stage to run to tbe current stage.next
+  <target name="update-last-stage" extensionOf="fetch-from-source,validate-in-dev,deploy-in-dev,validate-in-test,deploy-in-test,validate-in-stage,deploy-in-stage,validate-in-production,deploy-in-production">
+    <echo>Updating stage in file [${sfmt.build.properties}]</echo>
+    <propertyfile file="${sfmt.build.properties}">
+      <entry key="run.stage.last" value=""/>
+    </propertyfile>
+  </target>
+  -->
+
+</project>
