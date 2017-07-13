@@ -22,10 +22,11 @@ A *Work Item* (`work` for short) refers to any set of changes to be made in a mi
 
 A `patch` is an update to the work item package prior to completing the full migration.
 
-The `source` is the Salesforce Org where the metadata components originates.An *environment* (`env` for short) is a Salesforce Org targeted for an action.
+The `source` is the Salesforce Org where the metadata components originates. An *environment* (`env` for short) is a Salesforce Org targeted for an action.
 
 ### Configuration
 To interact with a Salesforce Org you must provide a username and password (or a session ID, but this tool hasn't been built for that option yet) to the tool.
+
 These values can be set with the `auth.username` and `auth.password` properties in the `build.properties` file or as options on the command line.
 
 Set the username to your Production Org username and the build script will automatically append the environment name when another Org is targeted.
