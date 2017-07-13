@@ -12,13 +12,16 @@ ant <target> [-D<property>=<value> ...]
 ```
 
 Properties must be passed in with the -D flag to be recognized within the ant build scripts. The advantage of defining everything within the build scripts rather than some other wrapper is that this tool should be platform independent and not require any additional software to run.
+
 > Note: Some properties names have periods in them, which can cause issues in Windows Powershell. There are short properties names for the most common properties, but if you need to define another you can enclose the entire option in quotes, e.g. `ant new -Dwork=old "-Dsfmt.api.version=38.0"`
 
 ### Terms and Definitions
 A *Work Item* (`work` for short) refers to any set of changes to be made in a migration. The term is intentionally ambiguous to be open to different work flows, e.g.
 * as "projects", where a single package list all related components and migrates the complete project whether individual components are changed or not.
 * as "tasks", where individual packages are created to response to specific tasks, e.g. from a bug tracker.
+
 A `patch` is an update to the work item package prior to completing the full migration.
+
 The `source` is the Salesforce Org where the metadata components originates.An *environment* (`env` for short) is a Salesforce Org targeted for an action.
 
 ### Configuration
@@ -39,6 +42,7 @@ ant <target> -Dsfdc.conf.auth.username=me@my-other.org -Dsfdc.conf.auth.password
 There are two types of migrations:
 1. Work Item
 2. Patch
+
 A Work Item Migration is a complete migration from source to final destination. A Patch is a modification to a Work Item, for example to update a component that had issues or add a new component.
 
 When starting our with a migration you should always create a Work Item migration first, and create Patches only as needed.
@@ -68,6 +72,7 @@ ant new -Dwork=<workitem_name> -Dpatch=<patch_name>
 A Salesforce Migration consist of at least 2 steps:
 1. Download Salesforce Metadata Components from a Salesforce Organization.
 2. Upload Salesforce Metadata Components to a Salesforce Organizaton.
+
 In the Migration Tool these and referred to as a *retrieve* and *deploy*, respectively. A deploy task can also run with with the checkOnly option which runs any pre-deployment tests but rollsback without making changes to the environment; refered to as a *validation*. Each deploy task, whether as a full deploy or just a validation, will generate a Request ID, recognizable as a 15-18 character Salesforce ID, which can be used to check on or complete the deployment at a later time.
 
 A deploy task may run Apex tests which must all pass before the task can successfully complete. With the stock migration tool, running tests is default when deploying into Production but not when deploying to a Sandbox.
