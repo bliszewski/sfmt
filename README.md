@@ -16,22 +16,25 @@ Properties must be passed in with the -D flag to be recognized within the ant bu
 > Note: Some properties names have periods in them, which can cause issues in Windows Powershell. There are short properties names for the most common properties, but if you need to define another you can enclose the entire option in quotes, e.g. `ant new -Dwork=old "-Dsfmt.api.version=38.0"`
 
 ### Terms and Definitions
+A *Migration* is any set of changes made in a Salesforce Org to be moved into another Salesforce Org. This tool attempts to account for both Metadata Components, which are specified in the `package.xml` file or manual configurations, listed in the `README.txt` file.
+
 A *Work Item* (`work` for short) refers to any set of changes to be made in a migration. The term is intentionally ambiguous to be open to different work flows, e.g.
-* as "projects", where a single package list all related components and migrates the complete project whether individual components are changed or not.
-* as "tasks", where individual packages are created to response to specific tasks, e.g. from a bug tracker.
+* as "projects", where a single migration list all related changes and migrates the complete project whether individual components are changed or not.
+* as "tasks", where individual migrations are created to response to specific tasks, e.g. from a bug tracker.
 
 A `patch` is an update to the work item package prior to completing the full migration.
 
 The `source` is the Salesforce Org where the metadata components originates. An *environment* (`env` for short) is a Salesforce Org targeted for an action.
 
 ### Configuration
+Look in the \*.properties` files for default configuration settings.
+
+#### Username and Password
 To interact with a Salesforce Org you must provide a username and password (or a session ID, but this tool hasn't been built for that option yet) to the tool.
 
-These values can be set with the `auth.username` and `auth.password` properties in the `build.properties` file or as options on the command line.
+These values can be set with the `auth.username` and `auth.password` properties in the `build.properties` file or as options on the command line. Set the username to your Production Org username and the build script will append the environment name when another Org is targeted.
 
-Set the username to your Production Org username and the build script will automatically append the environment name when another Org is targeted.
-
-This tool was built for a single Production Org with one or more Sandboxes, and assumes your Sandbox usernames and passwords are the same as your Production Org with the Sandbox name appened to the end of the username.
+This tool was built for a single Production Org with one or more Sandboxes, and assumes your Sandbox usernames and passwords match your production environment, following the standard behavior to appened a sandbox name to the end of the username.
 If you need to work with another Org you can override these properties on the command line.
 ```
 ant <target> -Dsfdc.conf.auth.username=me@my-other.org -Dsfdc.conf.auth.password=notmypassword -Dsfdc.conf.auth.serverurl="https://login.salesforce.com"
@@ -41,10 +44,8 @@ ant <target> -Dsfdc.conf.auth.username=me@my-other.org -Dsfdc.conf.auth.password
 
 ### Creating a New Migration
 There are two types of migrations:
-1. Work Item
-2. Patch
-
-A Work Item Migration is a complete migration from source to final destination. A Patch is a modification to a Work Item, for example to update a component that had issues or add a new component.
+1. Work Item Migration, a standard migration of components and configurations from one Org to another.
+2. Patch Migration, a modification to a migration, e.g. to fix a bug that was discovered during migration..
 
 When starting our with a migration you should always create a Work Item migration first, and create Patches only as needed.
 
