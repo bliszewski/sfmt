@@ -2,7 +2,7 @@
 Apache Ant build scripts for the Salesforce Force.com Migration Tool.
 
 ## Terms and Definitions
-A *Migration* is any set of changes made in a Salesforce Org to be moved into another Salesforce Org. This tool attempts to account for both Metadata Components, which are specified in the `package.xml` file or manual configurations, listed in the `README.txt` file.
+A *Migration* is any set of changes made in a Salesforce Org to be moved into another Salesforce Org. This tool attempts to account for both Metadata Components, which are specified in the `package.xml`, or manual configurations, listed in the `README.txt`.
 
 A *Work Item* (`work` for short) refers to any set of changes to be made in a migration. The term is intentionally ambiguous to be open to different work flows, e.g.
 * as "projects", where a single migration list all related changes and migrates the complete project whether individual components are changed or not.
@@ -16,6 +16,8 @@ The `source` is the Salesforce Org where the metadata components originates.
 
 ## Installation
 To use these build scripts you may first need to install [Apache Ant](https://ant.apache.org/) and add the [Salesforce Force.com Migration Tool plugin](https://developer.salesforce.com/page/Migration_Tool_Guide) to you Ant library path.
+
+Clone this repository where ever you want to run and store migration data.
 
 ## Configuration
 Edit the `*.properties` files with configuration settings.
@@ -47,7 +49,7 @@ ant <target> -Dsfdc.conf.auth.username=me@my-other.org -Dsfdc.conf.auth.password
 ```
 
 ## Usage
-As an Apache Ant build script, this tool is intended to be invoked form a command line with the basic form of
+As an Apache Ant build script, this tool is intended to be invoked from a command line with the basic form of
 ```
 ant <target> [-D<property>=<value> ...]
 ```
@@ -155,3 +157,6 @@ This `build.xml` can also be modified to create special tasks specific to the wo
 - [ ] Salesforce Data Loader hooks.
 - [ ] environments backups and component diffs.
 - [ ] version controlled packages and environments.
+
+### Ideas
+- [ ] rename all references to *workitem* to *migration*.
