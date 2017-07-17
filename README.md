@@ -1,21 +1,7 @@
 # sfmt
 Apache Ant build scripts for the Salesforce Force.com Migration Tool.
 
-## Installation
-To use these build scripts you may first need to install [Apache Ant](https://ant.apache.org/) and add the [Salesforce Force.com Migration Tool plugin](https://developer.salesforce.com/page/Migration_Tool_Guide) to you Ant library path.
-
-
-## Usage
-As an Apache Ant build script, this tool is intended to be invoked form a command line with the basic form of
-```
-ant <target> [-D<property>=<value> ...]
-```
-
-Properties must be passed in with the -D flag to be recognized within the ant build scripts. The advantage of defining everything within the build scripts rather than some other wrapper is that this tool should be platform independent and not require any additional software to run.
-
-> Note: Some properties names have periods in them, which can cause issues in Windows Powershell. There are short properties names for the most common properties, but if you need to define another you can enclose the entire option in quotes, e.g. `ant new -Dwork=old "-Dsfmt.api.version=38.0"`
-
-### Terms and Definitions
+## Terms and Definitions
 A *Migration* is any set of changes made in a Salesforce Org to be moved into another Salesforce Org. This tool attempts to account for both Metadata Components, which are specified in the `package.xml` file or manual configurations, listed in the `README.txt` file.
 
 A *Work Item* (`work` for short) refers to any set of changes to be made in a migration. The term is intentionally ambiguous to be open to different work flows, e.g.
@@ -28,27 +14,64 @@ An *environment* (`env` for short) is a Salesforce Org targeted for an action.
 
 The `source` is the Salesforce Org where the metadata components originates.
 
-### Configuration
-Edit the `\*.properties` files with configuration settings.
+## Installation
+To use these build scripts you may first need to install [Apache Ant](https://ant.apache.org/) and add the [Salesforce Force.com Migration Tool plugin](https://developer.salesforce.com/page/Migration_Tool_Guide) to you Ant library path.
+
+## Configuration
+Edit the `*.properties` files with configuration settings.
 
 * `build.properties` defines settings for the build scripts.
 * `sfdc.properties` defined settings for the Force.com Migration Tool.
 
-#### Username and Password
-A username and password need to be provided to connected to a Salesforce Org. 
+### Username, Password, and Server URL
+A username, password, and server URL needs to be provided to connected to a Salesforce Org. 
 
-> Session IDs as another options but are not currently supported.
+> Session IDs as another option but are not currently supported with this tool.
 
-Use `auth.username` and `auth.password` in the `build.properties` file or as options on the command line. 
+Set `auth.username` and `auth.password` in the `build.properties` file or as options on the command line. 
 
-> Be careful about adding `build.properties` in your repository if you put your username and password there. I'm not happy about storing these values in plaintext, but that seems to be standard practice until I can find a better solution.
+> Be careful about adding `build.properties` in your repository if you put your username and password there. I'm not happy about keeping these values in plaintext, but that seems to be standard practice.
 
 These properties should be set to your Production Org username and password; sandbox names are appened by the script when another environment is targeted.
 
-> This tool was built for a single Production Org with one or more Sandboxes, and assumes your Sandbox usernames and passwords match your production environment, following the standard behavior to appened a sandbox name to the end of the username. If you need to work with another Org you can override these properties on the command line.
+The Server URL is defined by Salesforce. While you can provide a unique URL to your Salesforce Org (rather, the Salesforce instance), Salesforce provides 2 generic URLs:
+
+1. `https://login.salesforce.com` for Production Orgs.
+2. `https://test.salesforce.com` for Sandboxes.
+
+Generally, You will not need to specify a server URL; the tool will do select it for you.
+
+> This tool was built around a single Production Org with one or more Sandboxes, and assumes your Sandbox usernames and passwords match your production environment, following the standard behavior to appened a sandbox name to the end of the username. If you need to work with another Org you can override these properties on the command line.
 ```
 ant <target> -Dsfdc.conf.auth.username=me@my-other.org -Dsfdc.conf.auth.password=notmypassword -Dsfdc.conf.auth.serverurl="https://login.salesforce.com"
 ```
+
+## Usage
+As an Apache Ant build script, this tool is intended to be invoked form a command line with the basic form of
+```
+ant <target> [-D<property>=<value> ...]
+```
+
+`target` is the name of a `<target>` item within the build script. Common targets are:
+```
+new                Create a new migration work item or patch.
+fetch-from-source  Retrieve the package.xml from source environment.
+validate-in-env    Perform a checkOnly=true deploy task in an environment.
+deploy-in-env      Perform a deployRecentValidation task in an environment.
+```
+
+Properties are passed to Apache Ant with the `-D` flag. 
+
+The most common properties are:
+```
+work     Name of the migration work item.
+patch    Name of the migration patch within a work item.
+env      Name of the environment to target.
+source   Name of the environment to use as a source.
+request  Request ID of a recent deploy (or validation) task.
+```
+
+> Note: Some properties names have periods in them, which can cause issues in Windows Powershell. There are short properties names for the most common properties, but if you need to define another you can enclose the entire option in quotes, e.g. `ant new -Dwork=old "-Dsfmt.api.version=38.0"`
 
 ### Creating a New Migration
 There are two types of migrations:
@@ -87,7 +110,7 @@ In the Force.com Migration Tool these and referred to as a *retrieve* and *deplo
 
 Each deploy task, whether as a full deploy or just a validation, will generate a Request ID, recognizable as a 15-18 character Salesforce ID, which can be used to check on or complete the deployment at a later time.
 
-> Note: The 15- and 18-character IDs are effectively the same, except that the 15-character ID is case-sensitive while the 18-character ID is not; the extra 3 characters encode case information. Using the 18-character ID is recommended anywhere case may be lost or distorted.
+> The 15- and 18-character IDs are effectively the same, except that the 15-character ID is case-sensitive while the 18-character ID is not; the extra 3 characters encode the proper casing. Using the 18-character ID is recommended anywhere case may be lost or distorted.
 
 A deploy task may run Apex tests which must all pass before the task can successfully complete. With the stock migration tool, running tests is default when deploying into Production but not when deploying to a Sandbox.
 
