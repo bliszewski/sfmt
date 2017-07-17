@@ -39,7 +39,7 @@ The Server URL is defined by Salesforce. While you can provide a unique URL to y
 1. `https://login.salesforce.com` for Production Orgs.
 2. `https://test.salesforce.com` for Sandboxes.
 
-Generally, You will not need to specify a server URL; the tool will do select it for you.
+It is not usually necessary to specify a server URL; the tool will use `https://login.salesforce.com` when the target environment is the Production Org and `https://test.salesforce.com` if another environment is targeted.
 
 > This tool was built around a single Production Org with one or more Sandboxes, and assumes your Sandbox usernames and passwords match your production environment, following the standard behavior to appened a sandbox name to the end of the username. If you need to work with another Org you can override these properties on the command line.
 ```
@@ -52,23 +52,21 @@ As an Apache Ant build script, this tool is intended to be invoked form a comman
 ant <target> [-D<property>=<value> ...]
 ```
 
-`target` is the name of a `<target>` item within the build script. Common targets are:
+`target` is the name attribute of a `<target>` in the build script. Common targets are:
 ```
-new                Create a new migration work item or patch.
-fetch-from-source  Retrieve the package.xml from source environment.
-validate-in-env    Perform a checkOnly=true deploy task in an environment.
-deploy-in-env      Perform a deployRecentValidation task in an environment.
+new                 Create a new migration work item or patch.
+fetch-from-source   Retrieve the package.xml from source environment.
+validate-in-env     Perform a checkOnly=true deploy task in an environment.
+deploy-in-env       Perform a deployRecentValidation task in an environment.
 ```
 
-Properties are passed to Apache Ant with the `-D` flag. 
-
-The most common properties are:
+Properties are passed to the build script with `-D`; more than one -D can be used. The most common properties are:
 ```
-work     Name of the migration work item.
-patch    Name of the migration patch within a work item.
-env      Name of the environment to target.
-source   Name of the environment to use as a source.
-request  Request ID of a recent deploy (or validation) task.
+work      Name of the migration work item.
+patch     Name of the migration patch within a work item.
+env       Name of the environment to target.
+source    Name of the environment to use as a source.
+request   Request ID of a recent deploy (or validation) task.
 ```
 
 > Note: Some properties names have periods in them, which can cause issues in Windows Powershell. There are short properties names for the most common properties, but if you need to define another you can enclose the entire option in quotes, e.g. `ant new -Dwork=old "-Dsfmt.api.version=38.0"`
@@ -128,6 +126,8 @@ ant fetch-from-source -Dwork=<workitem_name> [-Dpatch=<patch_name>]
 ```
 ant validate-in-env -Dwork=<workitem_name> [-Dpatch=<patch_name>] -Denv=<environment_name>
 ```
+
+> The output of this task contains the Request ID. You will need this ID in order to check up on the status of the validation or complete the deploy.
 
 #### Deploy Work Item Package in Destination
 ```
