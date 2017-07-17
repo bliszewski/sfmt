@@ -24,30 +24,38 @@ A *Work Item* (`work` for short) refers to any set of changes to be made in a mi
 
 A `patch` is an update to the work item package prior to completing the full migration.
 
-The `source` is the Salesforce Org where the metadata components originates. An *environment* (`env` for short) is a Salesforce Org targeted for an action.
+An *environment* (`env` for short) is a Salesforce Org targeted for an action.
+
+The `source` is the Salesforce Org where the metadata components originates.
 
 ### Configuration
-Look in the \*.properties` files for default configuration settings.
+Edit the `\*.properties` files with configuration settings.
+
+* `build.properties` defines settings for the build scripts.
+* `sfdc.properties` defined settings for the Force.com Migration Tool.
 
 #### Username and Password
-To interact with a Salesforce Org you must provide a username and password (or a session ID, but this tool hasn't been built for that option yet) to the tool.
+A username and password need to be provided to connected to a Salesforce Org. 
 
-These values can be set with the `auth.username` and `auth.password` properties in the `build.properties` file or as options on the command line. Set the username to your Production Org username and the build script will append the environment name when another Org is targeted.
+> Session IDs as another options but are not currently supported.
 
-This tool was built for a single Production Org with one or more Sandboxes, and assumes your Sandbox usernames and passwords match your production environment, following the standard behavior to appened a sandbox name to the end of the username.
-If you need to work with another Org you can override these properties on the command line.
+Use `auth.username` and `auth.password` in the `build.properties` file or as options on the command line. 
+
+> Be careful about adding `build.properties` in your repository if you put your username and password there. I'm not happy about storing these values in plaintext, but that seems to be standard practice until I can find a better solution.
+
+These properties should be set to your Production Org username and password; sandbox names are appened by the script when another environment is targeted.
+
+> This tool was built for a single Production Org with one or more Sandboxes, and assumes your Sandbox usernames and passwords match your production environment, following the standard behavior to appened a sandbox name to the end of the username. If you need to work with another Org you can override these properties on the command line.
 ```
 ant <target> -Dsfdc.conf.auth.username=me@my-other.org -Dsfdc.conf.auth.password=notmypassword -Dsfdc.conf.auth.serverurl="https://login.salesforce.com"
 ```
 
-> Note that this means you are providing or saving your username and password in plain text (which I'm not happy about and am looking for alternatives), so take care sharing these files (i.e. don't add `build.properties` to a git commit).
-
 ### Creating a New Migration
 There are two types of migrations:
 1. Work Item Migration, a standard migration of components and configurations from one Org to another.
-2. Patch Migration, a modification to a migration, e.g. to fix a bug that was discovered during migration..
+2. Patch Migration, a modification to a migration, e.g. to fix a bug that was discovered during migration.
 
-When starting our with a migration you should always create a Work Item migration first, and create Patches only as needed.
+Always start with a Work Item migration and use patches to update the package if needed.
 
 Using the build script to create a new Work Item migration will
 1. Make a directory with the work item name in the work items directory.
@@ -71,11 +79,15 @@ ant new -Dwork=<workitem_name> -Dpatch=<patch_name>
 ```
 
 ### Performing a Migration
-A Salesforce Migration consist of at least 2 steps:
+A Salesforce Migration always consist of at least 2 steps:
 1. Download Salesforce Metadata Components from a Salesforce Organization.
 2. Upload Salesforce Metadata Components to a Salesforce Organizaton.
 
-In the Migration Tool these and referred to as a *retrieve* and *deploy*, respectively. A deploy task can also run with with the checkOnly option which runs any pre-deployment tests but rollsback without making changes to the environment; refered to as a *validation*. Each deploy task, whether as a full deploy or just a validation, will generate a Request ID, recognizable as a 15-18 character Salesforce ID, which can be used to check on or complete the deployment at a later time.
+In the Force.com Migration Tool these and referred to as a *retrieve* and *deploy*, respectively. A deploy task can also run with with the `checkOnly` option to run pre-deployment tests but rollsback without making changes to the environment; this is referred to as a *validation*. 
+
+Each deploy task, whether as a full deploy or just a validation, will generate a Request ID, recognizable as a 15-18 character Salesforce ID, which can be used to check on or complete the deployment at a later time.
+
+> Note: The 15- and 18-character IDs are effectively the same, except that the 15-character ID is case-sensitive while the 18-character ID is not; the extra 3 characters encode case information. Using the 18-character ID is recommended anywhere case may be lost or distorted.
 
 A deploy task may run Apex tests which must all pass before the task can successfully complete. With the stock migration tool, running tests is default when deploying into Production but not when deploying to a Sandbox.
 
@@ -100,7 +112,7 @@ ant deploy-in-env -Dwork=<work_item_name> [-Dpatch=<patch_name>] -Denv=<environm
 ```
 
 ### Alternative Work Item Build Script
-Every new Work Item will have its own `build.xml` file which links back to the primary `build.xml` script. This allows all commands to be run from within the work item directory and, when paired with the work items `build.properties` that should set `work=<work_item_name>`, can be run without the additional command line argument. E.g.
+A new `build.xml` file is copied into the Work Item directory which imports the primary `build.xml` script. This allows all commands to be run from within the work item directory, and if the `work` properties is set in the local `build.properties` can be run without specifying the work item on the command line argument. E.g.
 ```
 ant new -Dpatch=<patch_name>
 ant fetch-from-source [-Dpatch=<patch_name>]
@@ -108,7 +120,7 @@ ant validate-in-env [-Dpatch=<patch_name>] -Denv=<environment_name>
 ant deploy-in-env [-Dpatch=<patch_name>] -Denv=<environment_name> -Drequest=<request_id>
 ```
 
-Additionally, this work item build script can be modified to for special behavior specific to work item.
+This `build.xml` can also be modified to create special tasks specific to the work item.
 
 ## TODO
 - [x] runnable targets to create required migration resources.
