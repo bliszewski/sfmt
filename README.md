@@ -1,3 +1,6 @@
+# NOTICE: This project is no longer being worked on as we move towards the [Salesforce DX (SFDX)](https://developer.salesforce.com/platform/dx) toolset.
+
+
 # sfmt
 Apache Ant build scripts for the Salesforce Force.com Migration Tool.
 
